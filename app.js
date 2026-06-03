@@ -1,22 +1,20 @@
 // আপনার গুগল অ্যাপস স্ক্রিপ্ট এর আসল Web App URL এখানে দিন
-const API_URL = "";https://script.google.com/macros/s/AKfycbz6R634B_sSNIpHxKfRt2OFKmA_xogjK1Z6eiHcSTzbKYvZhIXhscgGKSismZdEmDHW/exec
+const API_URL = "https://script.google.com/macros/s/AKfycbz6R634B_sSNIpHxKfRt2OFKmA_xogjK1Z6eiHcSTzbKYvZhIXhscgGKSismZdEmDHW/exec";
 
 let teachersData = [];
 let bootstrapModal;
-let selectedCluster = "";
-let selectedSchool = "";
-let searchTimeout; 
 
 document.addEventListener("DOMContentLoaded", () => {
     bootstrapModal = new bootstrap.Modal(document.getElementById('nidModal'));
     fetchLiveSheetsData();
 
-    document.getElementById('clusterFilter').addEventListener('change', onClusterSelectionChange);
-    // ২৫০ms থেকে কমিয়ে ২০০ms করা হয়েছে যেন আরও দ্রুত রেসপন্স করে
-    document.getElementById('searchInput').addEventListener('input', debounceSearch);
+    // ড্রপডাউন পরিবর্তনের ইভেন্ট লিসেনার
+    document.getElementById('clusterFilter').addEventListener('change', onClusterDropdownChange);
+    document.getElementById('schoolFilter').addEventListener('change', onSchoolDropdownChange);
     document.getElementById('nidForm').addEventListener('submit', executeFormPipeline);
 });
 
+// গুগল শিট ডাটাবেজ থেকে ডাটা স্ট্রিমিং
 async function fetchLiveSheetsData() {
     toggleLoadingState(true);
     try {
@@ -33,6 +31,7 @@ async function fetchLiveSheetsData() {
     }
 }
 
+// মূল ড্যাশবোর্ড ক্যালকুলেটর 
 function computeDashboardMetrics() {
     const total = teachersData.length;
     const completed = teachersData.filter(t => t['NID[ইংরজিতে লিখুন]'] && t['NID[ইংরজিতে লিখুন]'].toString().trim() !== "").length;
@@ -49,85 +48,70 @@ function computeDashboardMetrics() {
     pBar.setAttribute('aria-valuenow', pct);
 }
 
+// ১ম ড্রপডাউন: ক্লাস্টার লিস্ট জেনারেট করা
 function generateClusterDropdown() {
     const clusterSelect = document.getElementById('clusterFilter');
     const uniqueClusters = [...new Set(teachersData.map(t => t['ক্লাস্টার']).filter(Boolean))];
     
-    clusterSelect.innerHTML = '<option value="">-- ক্লাস্টার সিলেক্ট করুন --</option>';
+    clusterSelect.innerHTML = '<option value="">-- প্রথমে ক্লাস্টার সিলেক্ট করুন --</option>';
     uniqueClusters.sort().forEach(cluster => {
         clusterSelect.innerHTML += `<option value="${cluster}">${cluster}</option>`;
     });
 }
 
-function onClusterSelectionChange() {
-    selectedCluster = document.getElementById('clusterFilter').value;
-    selectedSchool = ""; 
-    document.getElementById('searchInput').value = ""; 
-
-    const schoolPanel = document.getElementById('schoolPanelSection');
-    const teachersPanel = document.getElementById('teachersPanelSection');
+// ধাপ ১: ক্লাস্টার পরিবর্তন হলে ২য় (বিদ্যালয়) ড্রপডাউন লোড হবে
+function onClusterDropdownChange() {
+    const selectedCluster = document.getElementById('clusterFilter').value;
+    const schoolSelect = document.getElementById('schoolFilter');
     const welcomeMsg = document.getElementById('welcomeMessage');
     const cardArea = document.getElementById('teachersContainer');
-    const schoolListContainer = document.getElementById('schoolListGroup');
 
+    // রিসেট এবং হাইড লজিক
+    schoolSelect.innerHTML = '<option value="">-- বিদ্যালয় সিলেক্ট করুন --</option>';
+    schoolSelect.disabled = true;
     cardArea.classList.add('d-none');
+    welcomeMsg.classList.remove('d-none');
 
-    if (!selectedCluster) {
-        schoolPanel.classList.add('d-none');
-        teachersPanel.className = "col-lg-12";
-        welcomeMsg.classList.remove('d-none');
-        return;
-    }
+    if (!selectedCluster) return;
 
+    // নির্দিষ্ট ক্লাস্টারের স্কুল ফিল্টারিং
     const schools = [...new Set(teachersData
         .filter(t => t['ক্লাস্টার'] === selectedCluster)
         .map(t => t['বিদ্যালয়ের নাম']).filter(Boolean))].sort();
 
-    document.getElementById('schoolCount').innerText = schools.length;
+    // ২য় ড্রপডাউন পপুলেট ও আনলক করা
+    schools.forEach(school => {
+        schoolSelect.innerHTML += `<option value="${school}">${school}</option>`;
+    });
+    schoolSelect.disabled = false;
+}
+
+// ধাপ ২: বিদ্যালয় সিলেক্ট করলে সাথে সাথে শিক্ষকদের তালিকা দেখাবে (Instant)
+function onSchoolDropdownChange() {
+    const selectedCluster = document.getElementById('clusterFilter').value;
+    const selectedSchool = document.getElementById('schoolFilter').value;
+    const welcomeMsg = document.getElementById('welcomeMessage');
+    const cardArea = document.getElementById('teachersContainer');
+
+    if (!selectedSchool) {
+        cardArea.classList.add('d-none');
+        welcomeMsg.classList.remove('d-none');
+        return;
+    }
 
     welcomeMsg.classList.add('d-none');
-    schoolPanel.classList.remove('d-none');
-    teachersPanel.className = "col-lg-8";
-
-    // এখানেও স্পিড বাড়ানোর জন্য সিঙ্গেল স্ট্রিং ব্যবহার করা হয়েছে
-    let schoolsHtml = "";
-    schools.forEach((school) => {
-        schoolsHtml += `
-            <button class="btn school-btn btn-light shadow-sm p-2 text-start rounded text-truncate" data-school="${school}" onclick="onSchoolButtonClick(this)">
-                <i class="fa-solid fa-school text-muted me-2 small"></i>${school}
-            </button>
-        `;
-    });
-    schoolListContainer.innerHTML = schoolsHtml;
-}
-
-function onSchoolButtonClick(buttonElement) {
-    document.querySelectorAll('.school-btn').forEach(btn => btn.classList.remove('active'));
-    buttonElement.classList.add('active');
-
-    selectedSchool = buttonElement.getAttribute('data-school');
-    renderTargetTeachers();
-}
-
-// সুপার অপ্টিমাইজড রেন্ডারিং ইঞ্জিন (High-Speed HTML Generation)
-function renderTargetTeachers(customDataset = null) {
-    const cardArea = document.getElementById('teachersContainer');
-    
-    // পুরানো কার্ডগুলো এক ঝটকায় মেমোরি থেকে মুছে ফেলা (গতির জন্য গুরুত্বপূর্ণ)
     cardArea.textContent = ''; 
     cardArea.classList.remove('d-none');
 
-    let filteredList = customDataset;
-    if (!filteredList) {
-        filteredList = teachersData.filter(t => t['ক্লাস্টার'] === selectedCluster && t['বিদ্যালয়ের নাম'] === selectedSchool);
-    }
+    // নির্দিষ্ট বিদ্যালয়ের শিক্ষক ফিল্টার (ইন-মেমোরি ফাস্ট রান)
+    const filteredList = teachersData.filter(t => t['ক্লাস্টার'] === selectedCluster && t['বিদ্যালয়ের নাম'] === selectedSchool);
 
     if (filteredList.length === 0) {
         cardArea.innerHTML = `<div class="col-12 text-center text-muted my-4"><h5>কোনো শিক্ষকের তথ্য পাওয়া যায়নি!</h5></div>`;
         return;
     }
 
-    // একটি মাত্র অ্যারেতে পুরো HTML পুশ করে শেষে একবার মাত্র DOM-এ রাইট করা হবে
+    // হাই-স্পিড বাফার দিয়ে এইচটিএমএল জেনারেট করা (১ মিলি-সেকেন্ড)
     const htmlBuffer = [];
     const len = filteredList.length;
 
@@ -139,16 +123,15 @@ function renderTargetTeachers(customDataset = null) {
         const stateText = isSet ? 'সম্পন্ন' : 'বাকি আছে';
 
         htmlBuffer.push(`
-            <div class="col-md-12 col-xl-6">
+            <div class="col-md-6 col-lg-4">
                 <div class="card h-100 shadow-sm teacher-card p-3 border">
                     <span class="badge badge-status ${stateBadge}">${stateText}</span>
                     <div class="card-body d-flex flex-column p-0 pt-2">
                         <h5 class="card-title text-dark fw-bold mb-1 pe-5">${teacher['শিক্ষকের নাম (বাংলা)']}</h5>
                         <p class="text-muted small mb-2">ক্রম নং: ${teacher['ক্রম']} | <span class="text-primary fw-semibold">${teacher['পদবি']}</span></p>
                         <hr class="text-black-50 my-1">
-                        <div class="small text-secondary mb-1"><strong>বিদ্যালয়:</strong> ${teacher['বিদ্যালয়ের নাম']}</div>
                         <div class="small text-secondary mb-1"><strong>মোবাইল:</strong> ${teacher['মোবাইল নম্বর'] || 'নেই'}</div>
-                        <div class="small text-secondary mb-2"><strong>NID:</strong> ${isSet ? `<code class="fs-6 text-dark fw-bold bg-light px-2 py-1 rounded border">${currentNid}</code>` : '<span class="text-danger fw-medium">সংগ্রহ করা হয়নি</span>'}</div>
+                        <div class="small text-secondary mb-3"><strong>NID:</strong> ${isSet ? `<code class="fs-6 text-dark fw-bold bg-light px-2 py-1 rounded border">${currentNid}</code>` : '<span class="text-danger fw-medium">সংগ্রহ করা হয়নি</span>'}</div>
                         <button class="btn btn-sm ${isSet ? 'btn-outline-secondary' : 'btn-primary'} w-100 mt-auto fw-bold py-2" onclick="launchNidModal('${teacher['ক্রম']}')">
                             <i class="fa-solid fa-pen-to-square me-1"></i> ${isSet ? 'NID সংশোধন করুন' : 'NID ইনপুট দিন'}
                         </button>
@@ -158,69 +141,11 @@ function renderTargetTeachers(customDataset = null) {
         `);
     }
     
-    // ব্রাউজারকে মাত্র ১ বার রেন্ডার করতে বাধ্য করা হচ্ছে (Instant Display)
+    // ডম-এ একবারে পুরো ডিজাইনটি রাইট করা
     cardArea.innerHTML = htmlBuffer.join('');
 }
 
-function debounceSearch() {
-    clearTimeout(searchTimeout);
-    searchTimeout = setTimeout(() => {
-        executeGlobalSearch();
-    }, 200); // দ্রুত রেসপন্সের জন্য টাইম ২০০ms করা হয়েছে
-}
-
-// অতি দ্রুতগতির ইন-মেমোরি গ্লোবাল সার্চ (Ultra Fast Index Search)
-function executeGlobalSearch() {
-    const query = document.getElementById('searchInput').value.toLowerCase().trim();
-    
-    const schoolPanel = document.getElementById('schoolPanelSection');
-    const teachersPanel = document.getElementById('teachersPanelSection');
-    const welcomeMsg = document.getElementById('welcomeMessage');
-    const cardArea = document.getElementById('teachersContainer');
-
-    if (!query) {
-        if (selectedCluster) {
-            onClusterSelectionChange();
-        } else {
-            schoolPanel.classList.add('d-none');
-            teachersPanel.className = "col-lg-12";
-            welcomeMsg.classList.remove('d-none');
-            cardArea.classList.add('d-none');
-        }
-        return;
-    }
-
-    document.getElementById('clusterFilter').value = "";
-    schoolPanel.classList.add('d-none');
-    teachersPanel.className = "col-lg-12";
-    welcomeMsg.classList.add('d-none');
-
-    const matchResults = [];
-    const dataLength = teachersData.length;
-    
-    // সার্চ ম্যাচিং স্পিডকে সর্বোচ্চ করার জন্য হাই-স্পিড নেটিভ ইন্ডেক্সিং লুপ
-    for (let i = 0; i < dataLength; i++) {
-        const teacher = teachersData[i];
-        
-        // বারংবার অবজেক্ট প্রোপার্টি কল এড়াতে লোকাল ভেরিয়েবল ব্যবহার
-        const name = teacher['শিক্ষকের নাম (বাংলা)'];
-        const serial = teacher['ক্রম'];
-        const mobile = teacher['মোবাইল নম্বর'];
-
-        const hasName = name && name.toLowerCase().indexOf(query) !== -1;
-        const hasSerial = serial && serial.toString().indexOf(query) !== -1;
-        const hasMobile = mobile && mobile.toString().indexOf(query) !== -1;
-
-        if (hasName || hasSerial || hasMobile) {
-            matchResults.push(teacher);
-            // একসাথে স্ক্রিনে ২০টির বেশি রেজাল্ট দেখালে ব্রাউজার স্লো হয়ে যায়, তাই লিমিট ২০ করা হলো
-            if (matchResults.length >= 20) break; 
-        }
-    }
-
-    renderTargetTeachers(matchResults);
-}
-
+// মোডাল প্যানেল ডাটা সেটআপ
 function launchNidModal(serialId) {
     const match = teachersData.find(t => t['ক্রম'].toString().trim() === serialId.toString().trim());
     if (!match) return;
@@ -241,6 +166,7 @@ function isValidNIDPattern(nidValue) {
     return /^\d+$/.test(nidValue) && (nidValue.length === 10 || nidValue.length === 13 || nidValue.length === 17);
 }
 
+// স্প্রেডশিটে ডেটা সাবমিশন পাইপলাইন
 async function executeFormPipeline(e) {
     e.preventDefault();
     
@@ -266,6 +192,7 @@ async function executeFormPipeline(e) {
             body: JSON.stringify(payload)
         });
 
+        // লাইভ ক্যাশ মেমোরি আপডেট
         const targetIndex = teachersData.findIndex(t => t['ক্রম'].toString().trim() === targetId.toString().trim());
         if (targetIndex !== -1) {
             teachersData[targetIndex]['NID[ইংরজিতে লিখুন]'] = inputVal;
@@ -274,11 +201,8 @@ async function executeFormPipeline(e) {
         bootstrapModal.hide();
         computeDashboardMetrics();
         
-        if (selectedSchool) {
-            renderTargetTeachers();
-        } else {
-            executeGlobalSearch();
-        }
+        // তালিকা রিফ্রেশ করা
+        onSchoolDropdownChange();
 
     } catch (err) {
         console.error(err);
