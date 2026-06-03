@@ -1,5 +1,5 @@
 // আপনার গুগল অ্যাপস স্ক্রিপ্ট এর আসল Web App URL এখানে দিন
-const API_URL = "https://script.google.com/macros/s/AKfycbxOoYzlvsqq9lf_CrFdQNsi1inNxBdxxOR91GbpSFaQb1QxvQiEUtRNf9YMolz49m_G/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbz6R634B_sSNIpHxKfRt2OFKmA_xogjK1Z6eiHcSTzbKYvZhIXhscgGKSismZdEmDHW/exec";
 
 let teachersData = [];
 let bootstrapModal;
