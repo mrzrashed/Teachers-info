@@ -1,5 +1,5 @@
 // Paste your actual deployed Google Apps Script Web App URL right here
-const API_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
+const API_URL = "https://script.google.com/macros/s/AKfycbxOoYzlvsqq9lf_CrFdQNsi1inNxBdxxOR91GbpSFaQb1QxvQiEUtRNf9YMolz49m_G/exec";
 
 let teachersData = [];
 let bootstrapModal;
