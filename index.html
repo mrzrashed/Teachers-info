@@ -8,19 +8,16 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f6f9; }
-        .teacher-card { transition: transform 0.2s, box-shadow 0.2s; border: none; border-radius: 12px; background: #fff; }
+        .teacher-card { transition: transform 0.2s, box-shadow 0.2s; border: none; border-radius: 12px; background: #fff; position: relative; }
         .teacher-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
         .badge-status { position: absolute; top: 15px; right: 15px; padding: 6px 12px; font-size: 0.75rem; border-radius: 30px; }
-        .school-btn { transition: all 0.2s; border: 1px solid #dee2e6; text-align: left; background: #fff; font-weight: 500; }
-        .school-btn:hover { background-color: #e9ecef; border-color: #adb5bd; transform: translateX(3px); }
-        .school-btn.active { background-color: #0d6efd !important; color: #fff !important; border-color: #0d6efd; }
     </style>
 </head>
 <body>
 
     <nav class="navbar navbar-dark bg-dark shadow-sm mb-4">
         <div class="container">
-            <span class="navbar-brand mb-0 h1"><i class="fa-solid fa-cloud-arrow-up text-info me-2"></i> Cloud-Based Teacher NID Collection</span>
+            <span class="navbar-brand mb-0 h1"><i class="fa-solid fa-cloud-arrow-up text-info me-2"></i> Teacher NID Collection System</span>
         </div>
     </nav>
 
@@ -56,18 +53,19 @@
             </div>
         </div>
 
-        <div class="card border-0 p-3 shadow-sm mb-4 bg-white">
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <label class="form-label small fw-bold text-muted">১. ক্লাস্টার নির্বাচন করুন (Select Cluster)</label>
-                    <select id="clusterFilter" class="form-select form-select-lg fs-6"><option value="">-- ক্লাস্টার সিলেক্ট করুন --</option></select>
+        <div class="card border-0 p-4 shadow-sm mb-4 bg-white">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-dark"><i class="fa-solid fa-layer-group text-primary me-1"></i> ১. ক্লাস্টার নির্বাচন করুন</label>
+                    <select id="clusterFilter" class="form-select form-select-lg fs-6">
+                        <option value="">-- প্রথমে ক্লাস্টার সিলেক্ট করুন --</option>
+                    </select>
                 </div>
-                <div class="col-md-8">
-                    <label class="form-label small fw-bold text-muted">অথবা সরাসরি শিক্ষক খুঁজুন (Global Search Engine)</label>
-                    <div class="input-group input-group-lg">
-                        <span class="input-group-text bg-white border-end-0"><i class="fa-solid fa-magnifying-glass text-muted"></i></span>
-                        <input type="text" id="searchInput" class="form-control border-start-0 fs-6" placeholder="যেকোনো শিক্ষকের নাম, আইডি (ক্রম), অথবা মোবাইল নম্বর দিয়ে সরাসরি খুঁজুন...">
-                    </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-bold text-dark"><i class="fa-solid fa-school text-primary me-1"></i> ২. বিদ্যালয় নির্বাচন করুন</label>
+                    <select id="schoolFilter" class="form-select form-select-lg fs-6" disabled>
+                        <option value="">-- আগে ক্লাস্টার সিলেক্ট করুন --</option>
+                    </select>
                 </div>
             </div>
         </div>
@@ -77,24 +75,13 @@
             <p class="mt-2 text-muted mb-0 small">গুগল ক্লাউড ড্রাইভ থেকে তথ্য লাইভ আনা হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...</p>
         </div>
 
-        <div class="row g-4">
-            <div id="schoolPanelSection" class="col-lg-4 d-none">
-                <div class="card border-0 shadow-sm p-3 bg-white sticky-top" style="top: 20px; max-height: 85vh; overflow-y: auto;">
-                    <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3"><i class="fa-solid fa-school text-primary me-2"></i>২. বিদ্যালয় তালিকা (<span id="schoolCount">0</span>)</h6>
-                    <div id="schoolListGroup" class="d-grid gap-2">
-                        </div>
-                </div>
-            </div>
-
-            <div id="teachersPanelSection" class="col-lg-12">
-                <div id="welcomeMessage" class="card border-0 shadow-sm p-5 text-center bg-white my-2">
-                    <i class="fa-solid fa-arrow-pointer fa-3x text-muted mb-3"></i>
-                    <h5 class="fw-bold text-secondary">তথ্য দেখার জন্য প্রথমে একটি ক্লাস্টার নির্বাচন করুন</h5>
-                    <p class="text-muted small mb-0">অথবা ডানদিকের গ্লোবাল সার্চ ইঞ্জিন ব্যবহার করে সরাসরি নির্দিষ্ট শিক্ষক খুঁজে বের করুন।</p>
-                </div>
-                <div id="teachersContainer" class="row g-3 d-none"></div>
-            </div>
+        <div id="welcomeMessage" class="card border-0 shadow-sm p-5 text-center bg-white my-2">
+            <i class="fa-solid fa-filter text-muted mb-3 fa-2x"></i>
+            <h5 class="fw-bold text-secondary">শিক্ষকদের তালিকা দেখতে উপরে ক্লাস্টার ও বিদ্যালয় নির্বাচন করুন</h5>
+            <p class="text-muted small mb-0">সঠিক তথ্য এক পলকে রেন্ডার করার জন্য ২-ধাপের ফিল্টার ব্যবহার করুন।</p>
         </div>
+
+        <div id="teachersContainer" class="row g-3 d-none"></div>
     </div>
 
     <div class="modal fade" id="nidModal" data-bs-backdrop="static" tabindex="-1" aria-hidden="true">
