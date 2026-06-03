@@ -1,22 +1,22 @@
 // আপনার গুগল অ্যাপস স্ক্রিপ্ট এর আসল Web App URL এখানে দিন
-const API_URL = "https://script.google.com/macros/s/AKfycbz6R634B_sSNIpHxKfRt2OFKmA_xogjK1Z6eiHcSTzbKYvZhIXhscgGKSismZdEmDHW/exec";
+const API_URL = "";https://script.google.com/macros/s/AKfycbz6R634B_sSNIpHxKfRt2OFKmA_xogjK1Z6eiHcSTzbKYvZhIXhscgGKSismZdEmDHW/exec
 
 let teachersData = [];
 let bootstrapModal;
 let selectedCluster = "";
 let selectedSchool = "";
+let searchTimeout; 
 
 document.addEventListener("DOMContentLoaded", () => {
     bootstrapModal = new bootstrap.Modal(document.getElementById('nidModal'));
     fetchLiveSheetsData();
 
-    // Event Handler Mappings
     document.getElementById('clusterFilter').addEventListener('change', onClusterSelectionChange);
-    document.getElementById('searchInput').addEventListener('input', executeGlobalSearch);
+    // ২৫০ms থেকে কমিয়ে ২০০ms করা হয়েছে যেন আরও দ্রুত রেসপন্স করে
+    document.getElementById('searchInput').addEventListener('input', debounceSearch);
     document.getElementById('nidForm').addEventListener('submit', executeFormPipeline);
 });
 
-// গুগল শিট ডাটাবেজ থেকে এপিআই এর মাধ্যমে ডাটা স্ট্রিমিং
 async function fetchLiveSheetsData() {
     toggleLoadingState(true);
     try {
@@ -33,7 +33,6 @@ async function fetchLiveSheetsData() {
     }
 }
 
-// মূল ড্যাশবোর্ড ক্যালকুলেটর 
 function computeDashboardMetrics() {
     const total = teachersData.length;
     const completed = teachersData.filter(t => t['NID[ইংরজিতে লিখুন]'] && t['NID[ইংরজিতে লিখুন]'].toString().trim() !== "").length;
@@ -50,7 +49,6 @@ function computeDashboardMetrics() {
     pBar.setAttribute('aria-valuenow', pct);
 }
 
-// ক্লাস্টার ড্রপডাউন জেনারেটর 
 function generateClusterDropdown() {
     const clusterSelect = document.getElementById('clusterFilter');
     const uniqueClusters = [...new Set(teachersData.map(t => t['ক্লাস্টার']).filter(Boolean))];
@@ -61,11 +59,10 @@ function generateClusterDropdown() {
     });
 }
 
-// ধাপ ১: ইউজার ক্লাস্টার সিলেক্ট করলে বিদ্যালয়গুলোর তালিকা লোড হবে (শিক্ষকের কার্ড না)
 function onClusterSelectionChange() {
     selectedCluster = document.getElementById('clusterFilter').value;
-    selectedSchool = ""; // রিসেট 
-    document.getElementById('searchInput').value = ""; // সার্চ রিসেট
+    selectedSchool = ""; 
+    document.getElementById('searchInput').value = ""; 
 
     const schoolPanel = document.getElementById('schoolPanelSection');
     const teachersPanel = document.getElementById('teachersPanelSection');
@@ -82,32 +79,29 @@ function onClusterSelectionChange() {
         return;
     }
 
-    // নির্দিষ্ট ক্লাস্টারের অন্তর্ভুক্ত স্কুল ফিল্টারিং
     const schools = [...new Set(teachersData
         .filter(t => t['ক্লাস্টার'] === selectedCluster)
         .map(t => t['বিদ্যালয়ের নাম']).filter(Boolean))].sort();
 
     document.getElementById('schoolCount').innerText = schools.length;
 
-    // প্যানেল লেআউট পরিবর্তন 
     welcomeMsg.classList.add('d-none');
     schoolPanel.classList.remove('d-none');
-    teachersPanel.className = "col-lg-8"; // শিক্ষকদের জন্য বাকি ৮ কলাম বরাদ্দ
+    teachersPanel.className = "col-lg-8";
 
-    // স্ক্রিনে স্কুলের বাটন প্যানেল রেন্ডার
-    schoolListContainer.innerHTML = "";
-    schools.forEach((school, index) => {
-        schoolListContainer.innerHTML += `
+    // এখানেও স্পিড বাড়ানোর জন্য সিঙ্গেল স্ট্রিং ব্যবহার করা হয়েছে
+    let schoolsHtml = "";
+    schools.forEach((school) => {
+        schoolsHtml += `
             <button class="btn school-btn btn-light shadow-sm p-2 text-start rounded text-truncate" data-school="${school}" onclick="onSchoolButtonClick(this)">
                 <i class="fa-solid fa-school text-muted me-2 small"></i>${school}
             </button>
         `;
     });
+    schoolListContainer.innerHTML = schoolsHtml;
 }
 
-// ধাপ ২: ইউজার সুনির্দিষ্ট বিদ্যালয়ে ক্লিক করলে তাৎক্ষণিক কার্ড রেন্ডার হবে (রকেট গতি)
 function onSchoolButtonClick(buttonElement) {
-    // অ্যাক্টিভ বাটন স্টাইল টগল 
     document.querySelectorAll('.school-btn').forEach(btn => btn.classList.remove('active'));
     buttonElement.classList.add('active');
 
@@ -115,13 +109,14 @@ function onSchoolButtonClick(buttonElement) {
     renderTargetTeachers();
 }
 
-// সুনির্দিষ্ট স্কুলের শিক্ষকদের কার্ড বানানোর ইঞ্জিন 
+// সুপার অপ্টিমাইজড রেন্ডারিং ইঞ্জিন (High-Speed HTML Generation)
 function renderTargetTeachers(customDataset = null) {
     const cardArea = document.getElementById('teachersContainer');
-    cardArea.innerHTML = "";
+    
+    // পুরানো কার্ডগুলো এক ঝটকায় মেমোরি থেকে মুছে ফেলা (গতির জন্য গুরুত্বপূর্ণ)
+    cardArea.textContent = ''; 
     cardArea.classList.remove('d-none');
 
-    // যদি গ্লোবাল সার্চ থেকে ডেটা আসে অথবা সিলেক্টেড স্কুল থেকে আসে
     let filteredList = customDataset;
     if (!filteredList) {
         filteredList = teachersData.filter(t => t['ক্লাস্টার'] === selectedCluster && t['বিদ্যালয়ের নাম'] === selectedSchool);
@@ -132,14 +127,18 @@ function renderTargetTeachers(customDataset = null) {
         return;
     }
 
-    // লুপ চালিয়ে কার্ড রেন্ডার করা (এটি মাত্র কয়েক মিলি-সেকেন্ড সময় নিবে)
-    filteredList.forEach(teacher => {
+    // একটি মাত্র অ্যারেতে পুরো HTML পুশ করে শেষে একবার মাত্র DOM-এ রাইট করা হবে
+    const htmlBuffer = [];
+    const len = filteredList.length;
+
+    for (let i = 0; i < len; i++) {
+        const teacher = filteredList[i];
         const currentNid = teacher['NID[ইংরজিতে লিখুন]'];
         const isSet = currentNid && currentNid.toString().trim() !== "";
         const stateBadge = isSet ? 'bg-success' : 'bg-warning text-dark';
         const stateText = isSet ? 'সম্পন্ন' : 'বাকি আছে';
 
-        const card = `
+        htmlBuffer.push(`
             <div class="col-md-12 col-xl-6">
                 <div class="card h-100 shadow-sm teacher-card p-3 border">
                     <span class="badge badge-status ${stateBadge}">${stateText}</span>
@@ -156,48 +155,72 @@ function renderTargetTeachers(customDataset = null) {
                     </div>
                 </div>
             </div>
-        `;
-        cardArea.innerHTML += card;
-    });
+        `);
+    }
+    
+    // ব্রাউজারকে মাত্র ১ বার রেন্ডার করতে বাধ্য করা হচ্ছে (Instant Display)
+    cardArea.innerHTML = htmlBuffer.join('');
 }
 
-// এক্সক্লুসিভ গ্লোবাল সার্চ: ক্লাস্টার বা স্কুল ছাড়াই যেকোনো শিক্ষক খোঁজার জন্য
+function debounceSearch() {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        executeGlobalSearch();
+    }, 200); // দ্রুত রেসপন্সের জন্য টাইম ২০০ms করা হয়েছে
+}
+
+// অতি দ্রুতগতির ইন-মেমোরি গ্লোবাল সার্চ (Ultra Fast Index Search)
 function executeGlobalSearch() {
     const query = document.getElementById('searchInput').value.toLowerCase().trim();
     
     const schoolPanel = document.getElementById('schoolPanelSection');
     const teachersPanel = document.getElementById('teachersPanelSection');
     const welcomeMsg = document.getElementById('welcomeMessage');
+    const cardArea = document.getElementById('teachersContainer');
 
     if (!query) {
-        // সার্চ খালি থাকলে আগের ফিল্টারিং অবস্থায় ফেরত যাবে
         if (selectedCluster) {
             onClusterSelectionChange();
         } else {
             schoolPanel.classList.add('d-none');
             teachersPanel.className = "col-lg-12";
             welcomeMsg.classList.remove('d-none');
-            document.getElementById('teachersContainer').classList.add('d-none');
+            cardArea.classList.add('d-none');
         }
         return;
     }
 
-    // ড্রপডাউন ভ্যালু রিসেট
     document.getElementById('clusterFilter').value = "";
     schoolPanel.classList.add('d-none');
     teachersPanel.className = "col-lg-12";
     welcomeMsg.classList.add('d-none');
 
-    // গ্লোবাল ফিল্টার ম্যাপিং
-    const matchResults = teachersData.filter(teacher => {
-        const dataSeed = `${teacher['শিক্ষকের নাম (বাংলা)']} ${teacher['ক্রম']} ${teacher['মোবাইল নম্বর']}`.toLowerCase();
-        return dataSeed.includes(query);
-    });
+    const matchResults = [];
+    const dataLength = teachersData.length;
+    
+    // সার্চ ম্যাচিং স্পিডকে সর্বোচ্চ করার জন্য হাই-স্পিড নেটিভ ইন্ডেক্সিং লুপ
+    for (let i = 0; i < dataLength; i++) {
+        const teacher = teachersData[i];
+        
+        // বারংবার অবজেক্ট প্রোপার্টি কল এড়াতে লোকাল ভেরিয়েবল ব্যবহার
+        const name = teacher['শিক্ষকের নাম (বাংলা)'];
+        const serial = teacher['ক্রম'];
+        const mobile = teacher['মোবাইল নম্বর'];
+
+        const hasName = name && name.toLowerCase().indexOf(query) !== -1;
+        const hasSerial = serial && serial.toString().indexOf(query) !== -1;
+        const hasMobile = mobile && mobile.toString().indexOf(query) !== -1;
+
+        if (hasName || hasSerial || hasMobile) {
+            matchResults.push(teacher);
+            // একসাথে স্ক্রিনে ২০টির বেশি রেজাল্ট দেখালে ব্রাউজার স্লো হয়ে যায়, তাই লিমিট ২০ করা হলো
+            if (matchResults.length >= 20) break; 
+        }
+    }
 
     renderTargetTeachers(matchResults);
 }
 
-// মোডাল প্যানেল হাইড্রেশন 
 function launchNidModal(serialId) {
     const match = teachersData.find(t => t['ক্রম'].toString().trim() === serialId.toString().trim());
     if (!match) return;
@@ -205,7 +228,7 @@ function launchNidModal(serialId) {
     document.getElementById('mId').value = match['ক্রম'];
     document.getElementById('mName').innerText = match['শিক্ষকের নাম (বাংলা)'];
     document.getElementById('mDesignation').innerText = match['পদবি'];
-    document.getElementById('mSchool').innerText = match[' विद्यालयों নাম'] || match['বিদ্যালয়ের নাম'];
+    document.getElementById('mSchool').innerText = match['বিদ্যালয়ের নাম'];
     
     const nInput = document.getElementById('nidInput');
     nInput.value = match['NID[ইংরজিতে লিখুন]'] || "";
@@ -218,7 +241,6 @@ function isValidNIDPattern(nidValue) {
     return /^\d+$/.test(nidValue) && (nidValue.length === 10 || nidValue.length === 13 || nidValue.length === 17);
 }
 
-// গুগল শিট ব্যাকএন্ডে ডেটা পাঠানোর সাবমিশন মেকানিজম
 async function executeFormPipeline(e) {
     e.preventDefault();
     
@@ -244,8 +266,7 @@ async function executeFormPipeline(e) {
             body: JSON.stringify(payload)
         });
 
-        // লাইভ ক্যাশ মেমোরিতে এনআইডি সেভ ও ইন্টারফেস রিফ্রেশ করা 
-        const targetIndex = teachersData.findIndex(t => t['क्रम'] || t['ক্রম'].toString().trim() === targetId.toString().trim());
+        const targetIndex = teachersData.findIndex(t => t['ক্রম'].toString().trim() === targetId.toString().trim());
         if (targetIndex !== -1) {
             teachersData[targetIndex]['NID[ইংরজিতে লিখুন]'] = inputVal;
         }
@@ -253,7 +274,6 @@ async function executeFormPipeline(e) {
         bootstrapModal.hide();
         computeDashboardMetrics();
         
-        // বর্তমান অবস্থা ধরে রাখা 
         if (selectedSchool) {
             renderTargetTeachers();
         } else {
